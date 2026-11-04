@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Link Safety Lab</title><link rel="stylesheet" href="/static/style.css"></head>
+<body><main class="shell">
+<div class="top"><span class="dot"></span> LINK SAFETY LAB <span class="tag">ADMIN</span></div>
+<section class="hero"><p class="eyebrow">LOCAL ADMINISTRATION</p><h1>Session <em>records</em></h1><p class="muted">Enter the ADMIN_TOKEN configured when starting the server. Only consented submissions appear here.</p></section>
+<section class="panel"><label>Admin token<input id="token" type="password" placeholder="Enter admin token"></label><button id="load">Load sessions</button><p id="status" class="status"></p></section>
+<section class="panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Platform</th><th>Browser / UA</th><th>Camera</th><th>Location</th><th>Coordinates</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+</main><script src="/static/admin.js"></script></body></html>

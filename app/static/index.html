@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Link Safety Lab — Awareness Demo</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="shell">
+  <div class="top"><span class="dot"></span> LINK SAFETY LAB <span class="tag">TRAINING SIMULATION</span></div>
+  <section class="hero">
+    <p class="eyebrow">PHISHING AWARENESS EXERCISE</p>
+    <h1>What can a website<br><em>actually see?</em></h1>
+    <p class="muted">This local training page demonstrates browser permissions and basic device metadata. It does not imitate a real company or collect anything until you choose to continue.</p>
+  </section>
+  <section class="panel">
+    <h2>Choose what to share</h2>
+    <p class="muted small">Every item is optional. Your browser will show its own permission prompt for camera or location.</p>
+    <label class="check"><input id="consent" type="checkbox"> <span>I understand this is a training simulation and agree to submit the selected information to this demo.</span></label>
+    <div class="choices">
+      <label class="choice"><input id="camera" type="checkbox"><span><b>Camera permission</b><small>Show a live preview in this page. Camera frames are never uploaded or saved.</small></span></label>
+      <label class="choice"><input id="location" type="checkbox"><span><b>Location permission</b><small>Share coordinates only if the browser grants permission and you submit the form.</small></span></label>
+      <label class="choice"><input id="metadata" type="checkbox" checked><span><b>Basic device metadata</b><small>Browser user-agent, platform label, language, and screen dimensions.</small></span></label>
+    </div>
+    <button id="start">Continue with selected options</button>
+    <p id="status" class="status" aria-live="polite">Nothing has been collected.</p>
+  </section>
+  <section id="cameraBox" class="panel hidden">
+    <h2>Camera preview</h2><video id="video" autoplay playsinline muted></video>
+    <p class="muted small">Live preview only. No image or video is transmitted.</p>
+    <button class="secondary" id="stopCamera">Stop camera</button>
+  </section>
+  <footer>Educational simulation · No brand impersonation · No hidden collection</footer>
+</main>
+<script src="/static/app.js"></script>
+</body></html>
