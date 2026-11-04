@@ -1,3 +1,6 @@
+/**
+ * admin.js — V2 admin page (V1-compatible with status column).
+ */
 const $ = id => document.getElementById(id);
 $("load").addEventListener("click", async () => {
   $("status").textContent = "Loading…";
@@ -9,8 +12,11 @@ $("load").addEventListener("click", async () => {
     for (const s of data) {
       const tr = document.createElement("tr");
       const values = [
-        new Date(s.created_at).toLocaleString(), s.platform || "—",
-        s.user_agent || "—", s.camera_permission,
+        s.created_at ? new Date(s.created_at).toLocaleString() : "—",
+        s.status || "—",
+        s.platform || "—",
+        s.user_agent || "—",
+        s.camera_permission,
         s.location_permission,
         s.latitude == null ? "—" : `${s.latitude.toFixed(5)}, ${s.longitude.toFixed(5)} (±${Math.round(s.accuracy || 0)}m)`
       ];
@@ -19,6 +25,6 @@ $("load").addEventListener("click", async () => {
       }
       $("rows").appendChild(tr);
     }
-    $("status").textContent = `${data.length} consented session(s).`;
+    $("status").textContent = `${data.length} session(s).`;
   } catch (e) { $("status").textContent = e.message; }
 });

@@ -1,106 +1,143 @@
-import os
-import sqlite3
+"""
+brAInfection V2 — Application entry point.
+
+Creates the FastAPI app, registers middleware, routers and static mounts.
+"""
+import logging
+import sys
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from starlette.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
+from app.database import Base, engine
+
+# Import all models so SQLAlchemy knows about them
+import app.models  # noqa: F401
+
+# Routes
+from app.routes.visitors import router as visitors_router
+from app.routes.sessions import router as sessions_router
+from app.routes.consent import router as consent_router
+from app.routes.admin import router as admin_router
+from app.routes.legacy import router as legacy_router
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+LOG_FORMAT = "%(asctime)s [%(name)s] %(levelname)s %(message)s"
+logging.basicConfig(
+    level=logging.INFO,
+    format=LOG_FORMAT,
+    stream=sys.stdout,
+)
+logger = logging.getLogger("brAInfection")
+
+# ---------------------------------------------------------------------------
+# Lifespan: create tables on startup (dev convenience; Alembic is canonical)
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    if settings.is_dev:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Dev mode: ensured all tables exist.")
+    yield
+
+
+# ---------------------------------------------------------------------------
+# App
+# ---------------------------------------------------------------------------
 BASE = Path(__file__).resolve().parent
-DB_PATH = Path(os.getenv("DB_PATH", BASE.parent / "data" / "sessions.db"))
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "change-this-local-demo-token")
 
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-app = FastAPI(title="Phishing Awareness Lab", version="1.0.0")
+app = FastAPI(
+    title="brAInfection — Phishing Awareness Lab",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# ---------------------------------------------------------------------------
+# Middleware
+# ---------------------------------------------------------------------------
+settings = get_settings()
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Add a unique request ID to every request for traceability."""
+    request_id = str(uuid.uuid4())[:8]
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    # Log request (never log sensitive values: tokens, coordinates, full UA)
+    logger.info(
+        "req=%s method=%s path=%s status=%d",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+    )
+    return response
+
+
+# ---------------------------------------------------------------------------
+# Global exception handler
+# ---------------------------------------------------------------------------
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Return a consistent JSON error shape for unhandled exceptions."""
+    request_id = getattr(request.state, "request_id", "unknown")
+    logger.exception("Unhandled exception req=%s: %s", request_id, exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "internal_server_error",
+            "detail": "An unexpected error occurred.",
+            "request_id": request_id,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
+app.include_router(visitors_router)
+app.include_router(sessions_router)
+app.include_router(consent_router)
+app.include_router(admin_router)
+app.include_router(legacy_router)
+
+# ---------------------------------------------------------------------------
+# Static files
+# ---------------------------------------------------------------------------
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
 
-def connect():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-with connect() as conn:
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY,
-            created_at TEXT NOT NULL,
-            consented INTEGER NOT NULL,
-            user_agent TEXT,
-            platform TEXT,
-            language TEXT,
-            screen_width INTEGER,
-            screen_height INTEGER,
-            camera_permission TEXT,
-            location_permission TEXT,
-            latitude REAL,
-            longitude REAL,
-            accuracy REAL
-        )
-    """)
-
-
-class SessionIn(BaseModel):
-    consent: bool
-    user_agent: str = Field(default="", max_length=600)
-    platform: str = Field(default="", max_length=120)
-    language: str = Field(default="", max_length=80)
-    screen_width: int | None = Field(default=None, ge=0, le=20000)
-    screen_height: int | None = Field(default=None, ge=0, le=20000)
-    camera_permission: str = Field(default="not_requested", max_length=40)
-    location_permission: str = Field(default="not_requested", max_length=40)
-    latitude: float | None = Field(default=None, ge=-90, le=90)
-    longitude: float | None = Field(default=None, ge=-180, le=180)
-    accuracy: float | None = Field(default=None, ge=0, le=100000)
-
-
+# ---------------------------------------------------------------------------
+# Page routes
+# ---------------------------------------------------------------------------
 @app.get("/")
 def index():
     return FileResponse(BASE / "static" / "index.html")
 
 
-@app.post("/api/session")
-def create_session(data: SessionIn):
-    if not data.consent:
-        raise HTTPException(status_code=400, detail="Consent is required.")
-    sid = str(uuid.uuid4())
-    now = datetime.now(timezone.utc).isoformat()
-    with connect() as conn:
-        conn.execute("""
-            INSERT INTO sessions (
-                id, created_at, consented, user_agent, platform, language,
-                screen_width, screen_height, camera_permission,
-                location_permission, latitude, longitude, accuracy
-            ) VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            sid, now, data.user_agent, data.platform, data.language,
-            data.screen_width, data.screen_height, data.camera_permission,
-            data.location_permission, data.latitude, data.longitude, data.accuracy
-        ))
-    return {"saved": True, "session_id": sid}
-
-
 @app.get("/admin")
 def admin_page():
     return FileResponse(BASE / "static" / "admin.html")
-
-
-@app.get("/api/sessions")
-def sessions(x_admin_token: str | None = Header(default=None)):
-    if not x_admin_token or x_admin_token != ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid admin token.")
-    with connect() as conn:
-        rows = conn.execute("""
-            SELECT id, created_at, user_agent, platform, language,
-                   screen_width, screen_height, camera_permission,
-                   location_permission, latitude, longitude, accuracy
-            FROM sessions ORDER BY created_at DESC LIMIT 250
-        """).fetchall()
-    return [dict(row) for row in rows]
 
 
 @app.get("/health")
