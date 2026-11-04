@@ -6,6 +6,7 @@ from app.models.device import DeviceDetails
 from app.models.location import LocationUpdate
 from app.models.camera_event import CameraEvent
 from app.models.audit_log import AuditLog
+from app.models.telemetry_event import TelemetryEvent, TelemetryEventType
 
 __all__ = [
     "Visitor",
@@ -15,4 +16,6 @@ __all__ = [
     "LocationUpdate",
     "CameraEvent",
     "AuditLog",
+    "TelemetryEvent",
+    "TelemetryEventType",
 ]

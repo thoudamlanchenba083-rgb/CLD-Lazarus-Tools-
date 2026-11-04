@@ -1,6 +1,9 @@
 """Pydantic schemas for telemetry and device/location data."""
 from datetime import datetime
+from typing import Any
 from pydantic import BaseModel, Field
+
+from app.models.telemetry_event import TelemetryEventType
 
 
 class DeviceSubmit(BaseModel):
@@ -45,3 +48,21 @@ class LocationResponse(BaseModel):
     recorded_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TelemetryItem(BaseModel):
+    """Single telemetry item within a batched request."""
+    event_type: TelemetryEventType
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime | None = None
+
+
+class TelemetryBatchSubmit(BaseModel):
+    """Batched events submitted by visitor."""
+    events: list[TelemetryItem] = Field(..., min_length=1, max_length=50)
+
+
+class TelemetryBatchResponse(BaseModel):
+    """Batch recording response."""
+    received: int
+    recorded: int

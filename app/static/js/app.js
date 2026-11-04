@@ -52,6 +52,7 @@ $("start").addEventListener("click", async () => {
 
   try {
     await SessionManager.startSession();
+    if (typeof TelemetryPipeline !== "undefined") TelemetryPipeline.init();
     $("startStatus").textContent = "Session started. Use the toggles below to control sharing.";
     $("startPanel").classList.add("hidden");
     $("consentPanel").classList.remove("hidden");

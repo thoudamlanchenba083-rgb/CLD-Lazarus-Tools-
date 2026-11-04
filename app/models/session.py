@@ -1,11 +1,15 @@
 """Session model — an anonymous, expiring session linked to a visitor."""
 import enum
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Integer, String, DateTime, Enum, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.telemetry_event import TelemetryEvent
 
 
 class SessionStatus(str, enum.Enum):
@@ -59,6 +63,9 @@ class SessionRecord(Base):
     )
     camera_events: Mapped[list["CameraEvent"]] = relationship(
         "CameraEvent", back_populates="session", cascade="all, delete-orphan"
+    )
+    telemetry_events: Mapped[list["TelemetryEvent"]] = relationship(
+        "TelemetryEvent", back_populates="session", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
