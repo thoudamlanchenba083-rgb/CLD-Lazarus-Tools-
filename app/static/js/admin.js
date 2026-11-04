@@ -1,16 +1,18 @@
 /**
- * admin.js — V2 admin page (V1-compatible with status column).
+ * admin.js — V2 admin page with REST loading and real-time live WebSocket initiation.
  */
 const $ = id => document.getElementById(id);
 $("load").addEventListener("click", async () => {
+  const token = $("token").value.trim();
   $("status").textContent = "Loading…";
   try {
-    const r = await fetch("/api/sessions", { headers: { "X-Admin-Token": $("token").value } });
+    const r = await fetch("/api/sessions", { headers: { "X-Admin-Token": token } });
     if (!r.ok) throw new Error(r.status === 401 ? "Invalid token" : "Request failed");
     const data = await r.json();
     $("rows").replaceChildren();
     for (const s of data) {
       const tr = document.createElement("tr");
+      tr.id = `session-${s.id}`;
       const values = [
         s.created_at ? new Date(s.created_at).toLocaleString() : "—",
         s.status || "—",
@@ -25,6 +27,13 @@ $("load").addEventListener("click", async () => {
       }
       $("rows").appendChild(tr);
     }
-    $("status").textContent = `${data.length} session(s).`;
-  } catch (e) { $("status").textContent = e.message; }
+    $("status").textContent = `${data.length} session(s) loaded. Initializing live WebSocket...`;
+
+    // Start live WebSocket feed
+    if (typeof AdminLive !== "undefined") {
+      AdminLive.init(token);
+    }
+  } catch (e) {
+    $("status").textContent = e.message;
+  }
 });

@@ -1,18 +1,19 @@
-"""Admin routes — V1-compatible token-based admin API.
-
-Will be replaced with proper login/cookie auth in Phase 10.
-"""
+"""Admin routes & WebSocket hub for real-time dashboard updates."""
+import asyncio
 import logging
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketClose
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.database import get_db
-from app.models.session import SessionRecord
+from app.database import get_db, SessionLocal
+from app.models.session import SessionRecord, SessionStatus
+from app.websocket.manager import manager
 
 logger = logging.getLogger("brAInfection.admin")
-router = APIRouter(prefix="/api", tags=["admin"])
+router = APIRouter(tags=["admin"])
 
 
 def _verify_admin(x_admin_token: str | None = Header(default=None)):
@@ -22,7 +23,7 @@ def _verify_admin(x_admin_token: str | None = Header(default=None)):
         raise HTTPException(status_code=401, detail="Invalid admin token.")
 
 
-@router.get("/sessions")
+@router.get("/api/sessions")
 def list_sessions(
     x_admin_token: str | None = Header(default=None),
     db: Session = Depends(get_db),
@@ -49,7 +50,6 @@ def list_sessions(
             "platform": None,
             "user_agent": None,
         }
-        # Populate from related tables if available
         if s.device_details:
             d = s.device_details[0]
             entry["platform"] = d.os or d.browser or ""
@@ -69,3 +69,46 @@ def list_sessions(
                     entry["camera_permission"] = "denied"
         result.append(entry)
     return result
+
+
+@router.websocket("/ws/admin")
+async def admin_websocket_endpoint(
+    websocket: WebSocket,
+    token: str | None = Query(default=None),
+    admin_session: str | None = Cookie(default=None),
+):
+    """Admin real-time WebSocket connection.
+
+    Accepts only authenticated admins (via admin_session cookie or query token).
+    Maintains heartbeat ping and drops dead connections.
+    """
+    settings = get_settings()
+    # Check credentials during handshake
+    auth_valid = False
+    if token and token == settings.admin_token:
+        auth_valid = True
+    elif admin_session and admin_session == settings.admin_token:
+        auth_valid = True
+
+    if not auth_valid:
+        # Reject handshake with 1008 Policy Violation
+        await websocket.close(code=1008, reason="Authentication failed")
+        logger.warning("Unauthenticated WebSocket handshake rejected")
+        return
+
+    await manager.connect(websocket)
+
+    try:
+        # Loop with heartbeat handling
+        while True:
+            # Wait for client heartbeat ping or message with timeout
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=45.0)
+                if data == "ping":
+                    await websocket.send_text("pong")
+            except asyncio.TimeoutError:
+                # Send server ping to keepalive
+                await websocket.send_json({"type": "ping", "time": datetime.now(timezone.utc).isoformat()})
+    except (WebSocketDisconnect, Exception) as e:
+        manager.disconnect(websocket)
+        logger.info("Admin WebSocket connection closed: %s", e)
