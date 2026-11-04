@@ -77,24 +77,37 @@ $("start").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Consent toggles (Phase 4)
+// Consent toggles (Phase 4 & 5)
 // ---------------------------------------------------------------------------
 $("consentDevice").addEventListener("change", async function () {
   if (!SessionManager.isActive()) return;
   const status = $("consentStatus");
   try {
     if (this.checked) {
+      const payload = typeof DeviceCollector !== "undefined"
+        ? DeviceCollector.collect()
+        : {
+            user_agent: navigator.userAgent,
+            language: navigator.language,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            screen_width: screen.width,
+            screen_height: screen.height,
+            online: navigator.onLine,
+          };
+
+      // Show summary before sending
+      const summary = typeof DeviceCollector !== "undefined"
+        ? DeviceCollector.getSummaryText(payload)
+        : `UA: ${payload.user_agent}`;
+      const confirmed = confirm(`The following browser metadata will be submitted:\n\n${summary}\n\nDo you want to proceed?`);
+      if (!confirmed) {
+        this.checked = false;
+        return;
+      }
+
       await ConsentManager.grantConsent("DEVICE_METADATA");
-      // Send device metadata
-      const payload = {
-        user_agent: navigator.userAgent,
-        language: navigator.language,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        screen_width: screen.width,
-        screen_height: screen.height,
-        online: navigator.onLine,
-      };
-      await fetch("/api/device", {
+
+      const response = await fetch("/api/device", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,6 +116,12 @@ $("consentDevice").addEventListener("change", async function () {
         },
         body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || "Submission failed");
+      }
+
       $("indDevice").classList.remove("hidden");
       $("indicators").classList.remove("hidden");
       status.textContent = "Device metadata shared.";
