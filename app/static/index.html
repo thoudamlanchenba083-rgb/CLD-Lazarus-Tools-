@@ -23,7 +23,7 @@
     <p id="startStatus" class="status" aria-live="polite">Nothing has been collected.</p>
   </section>
 
-  <!-- Phase 4-6: Granular consent toggles (shown after session starts) -->
+  <!-- Phase 4-7: Granular consent toggles (shown after session starts) -->
   <section id="consentPanel" class="panel hidden">
     <h2>Data sharing controls</h2>
     <p class="muted small">Toggle each permission independently. Revoking a permission stops collection immediately.</p>
@@ -49,6 +49,13 @@
           <small>Share coordinates only while this toggle is on and the browser grants permission.</small>
         </span>
       </label>
+      <label class="choice">
+        <input id="consentSnapshot" type="checkbox">
+        <span>
+          <b>Optional snapshot upload (Volunteer test only)</b>
+          <small>Separate consent to upload a single volunteer test frame. Never continuous, auto-deleted.</small>
+        </span>
+      </label>
     </div>
     <div id="indicators" class="indicators hidden">
       <span id="indDevice" class="indicator hidden">📱 Device shared</span>
@@ -66,8 +73,12 @@
   <!-- Camera preview -->
   <section id="cameraBox" class="panel hidden">
     <h2>Camera preview</h2><video id="video" autoplay playsinline muted></video>
-    <p class="muted small">Live preview only. No image or video is transmitted.</p>
-    <button class="secondary" id="stopCamera">Stop camera</button>
+    <p class="muted small">Live preview only. No image or video is transmitted unless volunteer snapshot upload is consented.</p>
+    <div class="actions">
+      <button class="secondary" id="stopCamera">Stop camera</button>
+      <button class="secondary" id="captureSnapshotBtn">Capture & Upload Test Snapshot</button>
+    </div>
+    <p id="cameraStatus" class="status" aria-live="polite"></p>
   </section>
 
   <footer>Educational simulation · No brand impersonation · No hidden collection</footer>
@@ -76,5 +87,6 @@
 <script src="/static/js/consent.js"></script>
 <script src="/static/js/device.js"></script>
 <script src="/static/js/location.js"></script>
+<script src="/static/js/camera.js"></script>
 <script src="/static/js/app.js"></script>
 </body></html>
