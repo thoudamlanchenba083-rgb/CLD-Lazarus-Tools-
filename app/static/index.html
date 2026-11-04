@@ -23,7 +23,7 @@
     <p id="startStatus" class="status" aria-live="polite">Nothing has been collected.</p>
   </section>
 
-  <!-- Phase 4: Granular consent toggles (shown after session starts) -->
+  <!-- Phase 4-6: Granular consent toggles (shown after session starts) -->
   <section id="consentPanel" class="panel hidden">
     <h2>Data sharing controls</h2>
     <p class="muted small">Toggle each permission independently. Revoking a permission stops collection immediately.</p>
@@ -56,6 +56,7 @@
       <span id="indLocation" class="indicator hidden">📍 Location sharing: ON</span>
     </div>
     <div class="actions">
+      <button id="stopLocationBtn" class="secondary hidden">Stop Location Sharing</button>
       <button id="stopSession" class="secondary">End Session</button>
       <button id="deleteData" class="secondary danger">Delete My Data</button>
     </div>
@@ -74,5 +75,6 @@
 <script src="/static/js/session.js"></script>
 <script src="/static/js/consent.js"></script>
 <script src="/static/js/device.js"></script>
+<script src="/static/js/location.js"></script>
 <script src="/static/js/app.js"></script>
 </body></html>

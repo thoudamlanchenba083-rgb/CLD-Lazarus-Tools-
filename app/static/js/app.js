@@ -39,21 +39,6 @@ $("stopCamera").addEventListener("click", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Location helpers
-// ---------------------------------------------------------------------------
-function getLocation() {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) return resolve({ permission: "unsupported" });
-    navigator.geolocation.getCurrentPosition(
-      p => resolve({ permission: "granted", latitude: p.coords.latitude,
-        longitude: p.coords.longitude, accuracy: p.coords.accuracy }),
-      e => resolve({ permission: e.code === 1 ? "denied" : "unavailable" }),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
-    );
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Start button: create session (V2 flow)
 // ---------------------------------------------------------------------------
 $("start").addEventListener("click", async () => {
@@ -77,7 +62,7 @@ $("start").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Consent toggles (Phase 4 & 5)
+// Consent toggles (Phase 4, 5, 6)
 // ---------------------------------------------------------------------------
 $("consentDevice").addEventListener("change", async function () {
   if (!SessionManager.isActive()) return;
@@ -160,26 +145,48 @@ $("consentCamera").addEventListener("change", async function () {
   }
 });
 
+function stopLocationSharing() {
+  if (typeof LocationSharer !== "undefined") {
+    LocationSharer.stopSharing();
+  }
+  $("indLocation").classList.add("hidden");
+  $("stopLocationBtn").classList.add("hidden");
+}
+
+$("stopLocationBtn").addEventListener("click", async () => {
+  stopLocationSharing();
+  $("consentLocation").checked = false;
+  await ConsentManager.revokeConsent("LOCATION").catch(() => {});
+  $("consentStatus").textContent = "Location sharing stopped and consent revoked.";
+});
+
 $("consentLocation").addEventListener("change", async function () {
   if (!SessionManager.isActive()) return;
   const status = $("consentStatus");
   try {
     if (this.checked) {
       await ConsentManager.grantConsent("LOCATION");
-      status.textContent = "Requesting location…";
-      const loc = await getLocation();
-      if (loc.permission === "granted") {
-        $("indLocation").classList.remove("hidden");
-        $("indicators").classList.remove("hidden");
-        status.textContent = "Location shared.";
-      } else {
-        await ConsentManager.revokeConsent("LOCATION");
-        this.checked = false;
-        status.textContent = `Location permission: ${loc.permission}.`;
+      status.textContent = "Requesting location permission...";
+
+      if (typeof LocationSharer !== "undefined") {
+        LocationSharer.startSharing(
+          (pos) => {
+            $("indLocation").classList.remove("hidden");
+            $("indicators").classList.remove("hidden");
+            $("stopLocationBtn").classList.remove("hidden");
+            status.textContent = `Location sharing: ON (±${Math.round(pos.coords.accuracy || 0)}m)`;
+          },
+          (err) => {
+            stopLocationSharing();
+            ConsentManager.revokeConsent("LOCATION").catch(() => {});
+            this.checked = false;
+            status.textContent = `Location denied or unavailable (${err.message}).`;
+          }
+        );
       }
     } else {
+      stopLocationSharing();
       await ConsentManager.revokeConsent("LOCATION");
-      $("indLocation").classList.add("hidden");
       status.textContent = "Location consent revoked. Sharing stopped.";
     }
   } catch (e) {
@@ -193,6 +200,7 @@ $("consentLocation").addEventListener("change", async function () {
 // ---------------------------------------------------------------------------
 $("stopSession").addEventListener("click", async () => {
   stopCamera();
+  stopLocationSharing();
   ConsentManager.clearAll();
   await SessionManager.endSession();
   $("consentPanel").classList.add("hidden");
@@ -204,6 +212,7 @@ $("stopSession").addEventListener("click", async () => {
   $("consentCamera").checked = false;
   $("consentLocation").checked = false;
   $("indicators").classList.add("hidden");
+  $("stopLocationBtn").classList.add("hidden");
   $("startStatus").textContent = "Session ended. You can start a new one.";
 });
 
@@ -215,6 +224,7 @@ $("deleteData").addEventListener("click", async () => {
   const confirmed = confirm("This will end your session and request deletion of all collected data. Continue?");
   if (!confirmed) return;
   stopCamera();
+  stopLocationSharing();
   ConsentManager.clearAll();
   await SessionManager.endSession();
   $("consentPanel").classList.add("hidden");
@@ -222,5 +232,6 @@ $("deleteData").addEventListener("click", async () => {
   $("startPanel").classList.remove("hidden");
   $("start").disabled = false;
   $("consent").checked = false;
+  $("stopLocationBtn").classList.add("hidden");
   $("startStatus").textContent = "Session ended and data deletion requested.";
 });

@@ -25,6 +25,7 @@ from app.routes.visitors import router as visitors_router
 from app.routes.sessions import router as sessions_router
 from app.routes.consent import router as consent_router
 from app.routes.devices import router as devices_router
+from app.routes.locations import router as locations_router
 from app.routes.admin import router as admin_router
 from app.routes.legacy import router as legacy_router
 
@@ -120,6 +121,7 @@ app.include_router(visitors_router)
 app.include_router(sessions_router)
 app.include_router(consent_router)
 app.include_router(devices_router)
+app.include_router(locations_router)
 app.include_router(admin_router)
 app.include_router(legacy_router)
 
